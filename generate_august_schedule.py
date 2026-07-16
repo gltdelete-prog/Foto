@@ -14,6 +14,12 @@ NIGHT_BONUS = 500
 NORM_SHK = 1341
 THRESHOLD_SHK = 1300
 
+TIME_NIGHT = "01:00"
+TIME_MORNING = "05:00"
+TIME_AFTERNOON = "14:00"
+TRUCK_NIGHT = "Машина 2"
+TRUCK_DAY = "Машина 1"
+
 DRIVERS = {
     "ivan": "Иван",
     "alexey": "Алексей",
@@ -40,9 +46,9 @@ ROTATION = [
 ]
 
 TRIPS = {
-    "night": {"time": "02:00", "truck": "Машина 2", "count": 1, "label": "Ночной"},
-    "day_morning": {"time": "06:00", "truck": "Машина 1", "count": 0.5, "label": "Утренний"},
-    "day_evening": {"time": "18:00", "truck": "Машина 1", "count": 0.5, "label": "Вечерний"},
+    "night": {"time": TIME_NIGHT, "truck": TRUCK_NIGHT, "count": 1, "label": "Ночной"},
+    "day_morning": {"time": TIME_MORNING, "truck": TRUCK_DAY, "count": 0.5, "label": "Утренний"},
+    "day_afternoon": {"time": TIME_AFTERNOON, "truck": TRUCK_DAY, "count": 0.5, "label": "Дневной"},
 }
 
 thin = Side(style="thin", color="CCCCCC")
@@ -147,7 +153,10 @@ def build_workbook() -> Workbook:
     ws["A2"].alignment = center
 
     headers = [
-        "Дата", "День", "02:00\n(Маш.2)", "06:00\n(Маш.1)", "18:00\n(Маш.1)",
+        "Дата", "День",
+        f"{TIME_NIGHT}\n({TRUCK_NIGHT})",
+        f"{TIME_MORNING}\n({TRUCK_DAY})",
+        f"{TIME_AFTERNOON}\n({TRUCK_DAY})",
         "Резерв", "Рейсов\nвсего", "ШК\n(план)", "Выручка\n₽", "Примечание",
     ]
     for col, h in enumerate(headers, 1):
@@ -229,8 +238,8 @@ def build_workbook() -> Workbook:
     leg = total_row + 2
     ws.cell(row=leg, column=1, value="Легенда:").font = bold
     legends = [
-        (fill_night, "02:00 — ночной рейс (Машина 2)"),
-        (fill_day, "06:00 / 18:00 — дневные рейсы (Машина 1, один водитель)"),
+        (fill_night, f"{TIME_NIGHT} — ночной рейс ({TRUCK_NIGHT})"),
+        (fill_day, f"{TIME_MORNING} / {TIME_AFTERNOON} — дневные рейсы ({TRUCK_DAY}, один водитель)"),
         (fill_weekend, "Суббота / воскресенье"),
     ]
     for j, (f, text) in enumerate(legends):
@@ -320,7 +329,7 @@ def build_workbook() -> Workbook:
     ws3["A8"] = "Ротация ролей по неделям"
     ws3["A8"].font = bold
 
-    rot_headers = ["Неделя", "02:00 (ночь)", "06:00 + 18:00 (день)"]
+    rot_headers = ["Неделя", f"{TIME_NIGHT} (ночь)", f"{TIME_MORNING} + {TIME_AFTERNOON} (день)"]
     for col, h in enumerate(rot_headers, 1):
         c = ws3.cell(row=9, column=col, value=h)
         c.font = header_font
@@ -349,15 +358,12 @@ def build_workbook() -> Workbook:
 
     checklist = [
         ("Время", "Действие", "Порог ШК", "Машина", "Кто проверяет"),
-        ("01:00", "Проверить накопление ШК на парковке 7", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
-        ("01:30", "Выезд на ночную загрузку", f"≥ {THRESHOLD_SHK}", "Машина 2", "Ночной водитель"),
-        ("02:00", "Загрузка маршрут 7", str(NORM_SHK), "Машина 2", "Ночной водитель"),
-        ("05:30", "Проверить ШК перед утренней загрузкой", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
-        ("05:30", "Выезд на утреннюю загрузку", f"≥ {THRESHOLD_SHK}", "Машина 1", "Дневной водитель"),
-        ("06:00", "Загрузка маршрут 7", str(NORM_SHK), "Машина 1", "Дневной водитель"),
-        ("17:30", "Проверить ШК перед вечерней загрузкой", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
-        ("17:30", "Выезд на вечернюю загрузку", f"≥ {THRESHOLD_SHK}", "Машина 1", "Дневной водитель"),
-        ("18:00", "Загрузка маршрут 7", str(NORM_SHK), "Машина 1", "Дневной водитель"),
+        ("00:30", "Проверить накопление ШК на парковке 7", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
+        (TIME_NIGHT, "Загрузка маршрут 7 (ночь)", str(NORM_SHK), TRUCK_NIGHT, "Ночной водитель"),
+        ("04:30", "Проверить ШК перед утренней загрузкой", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
+        (TIME_MORNING, "Загрузка маршрут 7 (утро)", str(NORM_SHK), TRUCK_DAY, "Дневной водитель"),
+        ("13:30", "Проверить ШК перед дневной загрузкой", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
+        (TIME_AFTERNOON, "Загрузка маршрут 7 (день)", str(NORM_SHK), TRUCK_DAY, "Дневной водитель"),
     ]
     for r, row in enumerate(checklist, 3):
         for c, val in enumerate(row, 1):
