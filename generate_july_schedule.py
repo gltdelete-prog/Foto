@@ -13,6 +13,13 @@ NIGHT_BONUS = 500
 NORM_SHK = 1341
 THRESHOLD_SHK = 1300
 
+# Время погрузки
+TIME_NIGHT = "01:00"
+TIME_MORNING = "06:00"
+TIME_AFTERNOON = "14:00"
+TRUCK_NIGHT = "Машина 2"
+TRUCK_DAY = "Машина 1"
+
 DRIVERS = {
     "d1": "1 Водитель",
     "d2": "2 Водитель",
@@ -120,14 +127,17 @@ def build_workbook() -> Workbook:
 
     ws.merge_cells("A2:J2")
     ws["A2"] = (
-        f"3 рейса/сутки · 2 машины · {RATE_PER_TRIP} ₽/рейс + {NIGHT_BONUS} ₽ ночная смена · "
-        f"норма {NORM_SHK} ШК"
+        f"3 рейса/сутки ({TIME_NIGHT}, {TIME_MORNING}, {TIME_AFTERNOON}) · 2 машины · "
+        f"{RATE_PER_TRIP} ₽/рейс + {NIGHT_BONUS} ₽ ночная смена · норма {NORM_SHK} ШК"
     )
     ws["A2"].font = sub_font
     ws["A2"].alignment = center
 
     headers = [
-        "Дата", "День", "02:00\n(Маш.2)", "06:00\n(Маш.1)", "18:00\n(Маш.1)",
+        f"Дата", "День",
+        f"{TIME_NIGHT}\n({TRUCK_NIGHT})",
+        f"{TIME_MORNING}\n({TRUCK_DAY})",
+        f"{TIME_AFTERNOON}\n({TRUCK_DAY})",
         "Резерв", "Рейсов", "ШК (план)", "Выручка ₽", "Примечание",
     ]
     for col, h in enumerate(headers, 1):
@@ -275,11 +285,11 @@ def build_workbook() -> Workbook:
             shifts = []
             pay = 0
             if sch["night_driver"] == key:
-                shifts.append("02:00 — ночной рейс (Маш.2)")
+                shifts.append(f"{TIME_NIGHT} — ночной рейс ({TRUCK_NIGHT})")
                 pay += RATE_PER_TRIP + NIGHT_BONUS
             if sch["day_driver"] == key:
-                shifts.append("06:00 — утренний рейс (Маш.1)")
-                shifts.append("18:00 — вечерний рейс (Маш.1)")
+                shifts.append(f"{TIME_MORNING} — утренний рейс ({TRUCK_DAY})")
+                shifts.append(f"{TIME_AFTERNOON} — дневной рейс ({TRUCK_DAY})")
                 pay += RATE_PER_TRIP * 2
             if key in sch["reserve"]:
                 shifts.append("Резерв / ПВЗ")
@@ -337,6 +347,31 @@ def build_workbook() -> Workbook:
 
         for idx, w in enumerate([12, 6, 36, 8, 14], 1):
             ws_d.column_dimensions[get_column_letter(idx)].width = w
+
+    # Checklist sheet
+    ws4 = wb.create_sheet("Чек-лист ПВЗ")
+    ws4.merge_cells("A1:E1")
+    ws4["A1"] = "Ежедневный чек-лист — маршрут 7"
+    ws4["A1"].font = title_font
+    checklist = [
+        ("Время", "Действие", "Порог ШК", "Машина", "Кто"),
+        ("00:30", "Проверить ШК перед ночной загрузкой", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
+        (TIME_NIGHT, f"Загрузка маршрут 7 (ночь)", str(NORM_SHK), TRUCK_NIGHT, "Ночной водитель"),
+        ("05:30", "Проверить ШК перед утренней загрузкой", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
+        (TIME_MORNING, f"Загрузка маршрут 7 (утро)", str(NORM_SHK), TRUCK_DAY, "Дневной водитель"),
+        ("13:30", "Проверить ШК перед дневной загрузкой", f"≥ {THRESHOLD_SHK}", "—", "Дежурный ПВЗ"),
+        (TIME_AFTERNOON, f"Загрузка маршрут 7 (день)", str(NORM_SHK), TRUCK_DAY, "Дневной водитель"),
+    ]
+    for r, row in enumerate(checklist, 3):
+        for c, val in enumerate(row, 1):
+            cell = ws4.cell(row=r, column=c, value=val)
+            cell.border = border
+            cell.alignment = left
+            if r == 3:
+                cell.font = header_font
+                cell.fill = header_fill
+    for idx, w in enumerate([10, 42, 12, 12, 18], 1):
+        ws4.column_dimensions[get_column_letter(idx)].width = w
 
     return wb
 
