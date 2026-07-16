@@ -193,7 +193,7 @@ def build_workbook() -> Workbook:
 
     # Salary sheet
     ws2 = wb.create_sheet("Зарплата")
-    ws2.merge_cells("A1:G1")
+    ws2.merge_cells("A1:H1")
     ws2["A1"] = f"Зарплата водителей {START.strftime('%d.%m')} – {END.strftime('%d.%m.%Y')}"
     ws2["A1"].font = title_font
     ws2["A1"].alignment = center
@@ -261,6 +261,82 @@ def build_workbook() -> Workbook:
     ws3.column_dimensions["A"].width = 16
     ws3.column_dimensions["B"].width = 22
     ws3.column_dimensions["C"].width = 28
+
+    # Per-driver sheets
+    driver_daily: dict[str, list] = {k: [] for k in DRIVERS}
+    for sch in schedules:
+        d = sch["date"]
+        for key in DRIVERS:
+            if key not in sch["working"]:
+                driver_daily[key].append({
+                    "date": d, "status": "ВЫХОДНОЙ", "shifts": [], "pay": 0,
+                })
+                continue
+            shifts = []
+            pay = 0
+            if sch["night_driver"] == key:
+                shifts.append("02:00 — ночной рейс (Маш.2)")
+                pay += RATE_PER_TRIP + NIGHT_BONUS
+            if sch["day_driver"] == key:
+                shifts.append("06:00 — утренний рейс (Маш.1)")
+                shifts.append("18:00 — вечерний рейс (Маш.1)")
+                pay += RATE_PER_TRIP * 2
+            if key in sch["reserve"]:
+                shifts.append("Резерв / ПВЗ")
+            driver_daily[key].append({
+                "date": d, "status": "РАБОТА", "shifts": shifts, "pay": pay,
+            })
+
+    for key in ["d1", "d2", "d3"]:
+        name = DRIVERS[key]
+        ws_d = wb.create_sheet(name[:31])
+        ws_d.merge_cells("A1:E1")
+        ws_d["A1"] = f"{name} — личный график"
+        ws_d["A1"].font = title_font
+        ws_d["A1"].alignment = center
+
+        dh = ["Дата", "День", "Смена", "Рейсов", "Заработок ₽"]
+        for col, h in enumerate(dh, 1):
+            c = ws_d.cell(row=3, column=col, value=h)
+            c.font = header_font
+            c.fill = header_fill
+            c.alignment = center
+            c.border = border
+
+        total_trips = 0
+        total_pay = 0
+        for i, day in enumerate(driver_daily[key], 4):
+            d = day["date"]
+            trips = sum(1 for s in day["shifts"] if "рейс" in s)
+            shift_text = "\n".join(day["shifts"]) if day["shifts"] else day["status"]
+            row_vals = [
+                d.strftime("%d.%m.%Y"), DAY_NAMES[d.weekday()],
+                shift_text, trips if day["status"] == "РАБОТА" else "—", day["pay"] or "—",
+            ]
+            for col, val in enumerate(row_vals, 1):
+                cell = ws_d.cell(row=i, column=col, value=val)
+                cell.border = border
+                cell.alignment = center if col != 3 else left
+            if day["status"] == "ВЫХОДНОЙ":
+                for col in range(1, 6):
+                    ws_d.cell(row=i, column=col).fill = fill_off
+            elif trips >= 2:
+                ws_d.cell(row=i, column=3).fill = fill_day
+            elif "ночной" in shift_text:
+                ws_d.cell(row=i, column=3).fill = fill_night
+            total_trips += trips
+            total_pay += day["pay"]
+
+        tr = 4 + len(driver_daily[key])
+        ws_d.cell(row=tr, column=1, value="ИТОГО").font = bold
+        ws_d.cell(row=tr, column=4, value=total_trips).font = bold
+        ws_d.cell(row=tr, column=5, value=total_pay).font = bold
+        for col in range(1, 6):
+            ws_d.cell(row=tr, column=col).border = border
+            ws_d.cell(row=tr, column=col).fill = fill_total
+
+        for idx, w in enumerate([12, 6, 36, 8, 14], 1):
+            ws_d.column_dimensions[get_column_letter(idx)].width = w
 
     return wb
 
